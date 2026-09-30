@@ -51,6 +51,9 @@
   "build": {
     "appId": "com.local.background-video-renderer",
     "productName": "Background Video Renderer",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**",
       "dist-electron/**",
