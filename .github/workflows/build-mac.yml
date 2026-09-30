@@ -50,7 +50,7 @@ jobs:
       - name: Package DMG
         run: bash platforms/mac/package.sh ${{ matrix.arch }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: mac-${{ matrix.arch }}
           path: release/*.dmg

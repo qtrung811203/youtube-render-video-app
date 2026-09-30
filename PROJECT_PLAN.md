@@ -20,7 +20,7 @@ Kết quả xuất là MP4 1920×1080, 30fps, H.264 + AAC; thời lượng video
 - Font dự phòng chọn theo ngôn ngữ của từng câu (có kana → Nhật, có Hangul → Hàn) để chữ Hán không bị vẽ nhầm kiểu Hàn/Nhật; cảnh báo khi font và ngôn ngữ phụ đề không khớp.
 - Ngắt dòng bằng `Intl.Segmenter`: tiếng Nhật ngắt theo từ + quy tắc kinsoku (không mở dòng bằng 、。」…, không kết dòng bằng 「（…), tiếng Hàn giữ nguyên cụm từ (어절).
 - Font đóng gói được chia theo unicode-range; trước khi vẽ, app nạp đúng các phần glyph mà câu phụ đề cần (`ensureFonts`).
-- `Mo-Ung-Dung.bat` chỉ build lại khi mã nguồn thay đổi (`scripts/ensure-build.mjs`), vì font CJK làm bản build mất ~25–40 giây và `dist` ~115 MB.
+- `Mo-Ung-Dung.bat` chỉ build lại khi mã nguồn thay đổi (`scripts/ensure-build.mjs`), vì font CJK làm bản build mất ~15 giây; `dist` ~54 MB (Vite plugin trong `vite.config.ts` bỏ file `.woff` dự phòng, chỉ giữ `.woff2`).
 
 ## 3. Đầu vào và quy tắc quét thư mục
 
