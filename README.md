@@ -20,3 +20,7 @@ Chạy `npm run package:win`. Trình cài đặt NSIS sẽ nằm trong thư mụ
 4. Chọn mốc preview cùng 5 hoặc 10 giây, tạo preview, rồi nhấn **Render batch MP4**.
 
 Video có tên `ten-thu-muc_render.mp4` được lưu cạnh thư mục nguồn. App sẽ tự thêm số thứ tự nếu tên đó đã tồn tại.
+
+## macOS
+
+Xem [platforms/mac/README-mac.md](platforms/mac/README-mac.md). Bản `.dmg` cho chip Apple và Intel được GitHub Actions build tự động.

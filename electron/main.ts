@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { basename, dirname, extname, join, normalize, relative, resolve, isAbsolute } from 'path';
@@ -8,11 +8,9 @@ import { Cue, defaultSettings, EncodeRequest, EncodeResult, EncoderInfo, Setting
 
 const imageExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp']);
 const audioExt = new Set(['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg']);
-const gpuEncoders: EncoderInfo[] = [
-  { id: 'h264_nvenc', label: 'NVIDIA NVENC' },
-  { id: 'h264_amf', label: 'AMD AMF' },
-  { id: 'h264_qsv', label: 'Intel Quick Sync' }
-];
+const gpuEncoders: EncoderInfo[] = process.platform === 'darwin'
+  ? [{ id: 'h264_videotoolbox', label: 'Apple VideoToolbox' }]
+  : [{ id: 'h264_nvenc', label: 'NVIDIA NVENC' }, { id: 'h264_amf', label: 'AMD AMF' }, { id: 'h264_qsv', label: 'Intel Quick Sync' }];
 let windowRef: BrowserWindow | null = null;
 const active = new Map<string, { process?: ChildProcessWithoutNullStreams; cancelled: boolean }>();
 
@@ -91,7 +89,7 @@ async function getDuration(path: string) {
 let encoderProbe: Promise<EncoderInfo[]> | null = null;
 function detectEncoders() {
   encoderProbe ??= Promise.all(gpuEncoders.map(async (encoder) => {
-    const result = await run(ffmpegBin(), ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=black:s=256x144:d=0.2', '-c:v', encoder.id, '-pix_fmt', 'yuv420p', '-f', 'null', '-']);
+    const result = await run(ffmpegBin(), ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=black:s=640x360:d=0.2', '-c:v', encoder.id, '-pix_fmt', 'yuv420p', '-f', 'null', '-']);
     return result.code === 0 ? encoder : null;
   })).then((list) => list.filter((item): item is EncoderInfo => !!item));
   return encoderProbe;
@@ -101,6 +99,9 @@ function encoderArgs(encoder: string) {
     case 'h264_nvenc': return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', '21', '-b:v', '0'];
     case 'h264_amf': return ['-c:v', 'h264_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', '20', '-qp_p', '22'];
     case 'h264_qsv': return ['-c:v', 'h264_qsv', '-preset', 'faster', '-global_quality', '21'];
+    // Constant-quality (-q:v) only exists on Apple Silicon, so use a bitrate that works on Intel Macs too.
+    // allow_sw lets VMs without a media engine (e.g. CI runners) fall back to Apple's software encoder.
+    case 'h264_videotoolbox': return ['-c:v', 'h264_videotoolbox', '-b:v', '8M', '-maxrate', '12M', '-bufsize', '16M', '-allow_sw', '1'];
     // A still background changes rarely, so x264 can use a fast preset without visible loss.
     default: return ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-crf', '20'];
   }
@@ -181,6 +182,8 @@ app.whenReady().then(() => {
   // Lets the font picker list installed fonts via queryLocalFonts().
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback((permission as string) === 'local-fonts'));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === 'local-fonts');
+  // macOS routes Cmd+C/V/Z/A through the application menu; without one, text inputs lose those shortcuts.
+  if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }]));
   createWindow(); detectEncoders();
   // Previews from earlier sessions are no longer referenced.
   try { for (const name of readdirSync(tempRoot())) rmSync(join(tempRoot(), name), { recursive: true, force: true }); } catch { /* best effort */ }

@@ -90,6 +90,21 @@ npm start
 - `npm run dev`: chỉ dành cho phát triển; chạy Vite, TypeScript watch và Electron.
 - `npm run package:win`: build và tạo installer NSIS bằng electron-builder.
 
+## 7b. macOS
+
+Dùng chung toàn bộ mã nguồn; phần riêng nằm ở `platforms/mac/` (xem `README-mac.md`).
+
+| Hạng mục | Windows | macOS |
+| --- | --- | --- |
+| Encoder GPU | NVENC / AMF / QSV | `h264_videotoolbox` (`-b:v 8M -allow_sw 1`) |
+| Launcher | `Mo-Ung-Dung.bat` | `platforms/mac/Mo-Ung-Dung.command` |
+| Đóng gói | `npm run package:win` (NSIS) | `npm run package:mac` → `platforms/mac/package.sh` (ký ad-hoc + `.dmg`) |
+| Menu | mặc định | `appMenu/editMenu/viewMenu/windowMenu` (Cmd+C/V trong ô nhập) |
+| Font hệ thống | Malgun Gothic, Yu Gothic, Meiryo… | Apple SD Gothic Neo, AppleMyungjo, Hiragino, YuGothic/YuMincho |
+
+- CI: `.github/workflows/build-mac.yml` build `.dmg` arm64 (`macos-15`) và x64 (`macos-15-intel`) mỗi lần push `main`; tag `v*` đính kèm vào GitHub Release. Có bước kiểm tra binary FFmpeg darwin có VideoToolbox.
+- App chưa ký Developer ID: mở lần đầu bằng chuột phải → Open, hoặc `xattr -cr "/Applications/Background Video Renderer.app"`.
+- Font và React là `devDependencies` (đã được Vite gom vào `dist`), nên bộ cài không chứa thêm `node_modules` của font.
 ## 8. Lỗi đã xử lý
 
 ### v1 → v2: preview không khớp video

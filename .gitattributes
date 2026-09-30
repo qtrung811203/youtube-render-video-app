@@ -1,0 +1,7 @@
+# Shell scripts must keep LF endings or bash on macOS fails with "bad interpreter".
+*.command text eol=lf
+platforms/mac/package.sh text eol=lf
+*.sh text eol=lf
+*.plist text eol=lf
+*.yml text eol=lf
+*.bat text eol=crlf

@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
 
+export const isMac = navigator.platform.startsWith('Mac');
+/** Name of the Alt key as printed on the user's keyboard. */
+export const ALT_KEY = isMac ? 'Option' : 'Alt';
 export const fileName = (path?: string) => path?.split(/[\\/]/).pop() ?? 'Chưa chọn';
 export const round = (value: number, digits = 0) => { const f = 10 ** digits; return Math.round(value * f) / f; };
 export function formatTime(seconds: number) {

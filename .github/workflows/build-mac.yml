@@ -1,0 +1,63 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15        # Apple Silicon
+            arch: arm64
+          - runner: macos-15-intel  # Intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installs the darwin ffmpeg-static / ffprobe binaries for this runner's chip.
+      - run: npm ci
+
+      - name: Type-check
+        run: |
+          npx tsc -p tsconfig.json --noEmit
+          npx tsc -p tsconfig.electron.json --noEmit
+
+      - name: Check bundled FFmpeg (VideoToolbox)
+        continue-on-error: true
+        run: |
+          FF="$(node -p "require('ffmpeg-static')")"
+          FP="$(node -p "require('@ffprobe-installer/ffprobe').path")"
+          file "$FF" "$FP"
+          "$FF" -hide_banner -version | head -n 1
+          "$FF" -hide_banner -encoders | grep -E 'videotoolbox|libx264'
+          "$FF" -hide_banner -loglevel error -f lavfi -i color=black:s=1920x1080:d=1 \
+            -c:v h264_videotoolbox -b:v 8M -allow_sw 1 -f null - && echo "VideoToolbox OK"
+
+      - name: Package DMG
+        run: bash platforms/mac/package.sh ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: release/*.dmg
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.dmg

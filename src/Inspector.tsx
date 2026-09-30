@@ -5,7 +5,7 @@ import { clamp, H, logoRect, W } from './composer';
 import { FontPicker } from './FontPicker';
 import { useImage, type LoadedImage } from './media';
 import type { Layer } from './Stage';
-import { ColorField, fileName, Range, round, Section, Segmented, Toggle } from './ui';
+import { ALT_KEY, ColorField, fileName, Range, round, Section, Segmented, Toggle } from './ui';
 
 const SUBTITLE_PRESETS: Array<{ name: string; patch: Partial<SubtitleStyle> }> = [
   { name: 'Hộp mờ', patch: { color: '#FFFFFF', strokeWidth: 0, shadow: 0, backgroundMode: 'content', backgroundColor: '#000000', backgroundOpacity: 0.55, paddingX: 26, paddingY: 10, radius: 10 } },
@@ -82,7 +82,7 @@ function LogoPanel({ settings, logos, logoImage, onLogo, onSettings, onPickLogoD
       <Range label="Độ hiện (opacity)" value={round(logo.opacity * 100)} min={0} max={100} unit="%" onChange={(v) => onLogo({ opacity: v / 100 })} />
       <label>Thứ tự lớp</label>
       <Segmented value={settings.layerOrder} onChange={(layerOrder) => onSettings({ layerOrder })} options={[{ value: 'logo-above', label: 'Logo trên phụ đề' }, { value: 'subtitle-above', label: 'Phụ đề trên logo' }]} />
-      <p className="hint">Kéo logo trên khung để di chuyển, kéo góc để đổi cỡ. Giữ Alt để tắt hít cạnh.</p>
+      <p className="hint">Kéo logo trên khung để di chuyển, kéo góc để đổi cỡ. Giữ {ALT_KEY} để tắt hít cạnh.</p>
     </Section>
   </>;
 }

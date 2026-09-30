@@ -1,6 +1,6 @@
 /**
  * Fonts bundled with the app (via @fontsource, split by unicode-range so only the glyph subsets a
- * subtitle actually uses are loaded) plus well-known Windows fonts. Bundled fonts render identically
+ * subtitle actually uses are loaded) plus well-known Windows/macOS fonts (listed only when installed). Bundled fonts render identically
  * on every machine, which matters because the editor and the video share the same canvas renderer.
  */
 import '@fontsource/noto-sans-kr/400.css'; import '@fontsource/noto-sans-kr/700.css';
@@ -36,7 +36,9 @@ export const FONT_CATALOG: FontEntry[] = [
   { family: 'Jua', group: 'ko', bundled: true, style: 'Tròn · dễ thương', boldOnly400: true },
   { family: 'Do Hyeon', group: 'ko', bundled: true, style: 'Tiêu đề', boldOnly400: true },
   { family: 'Black Han Sans', group: 'ko', bundled: true, style: 'Rất đậm · tiêu đề', boldOnly400: true },
-  { family: 'Malgun Gothic', group: 'ko', bundled: false, style: 'Windows' },
+  { family: 'Malgun Gothic', group: 'ko', bundled: false, style: 'Hệ thống' },
+  { family: 'Apple SD Gothic Neo', group: 'ko', bundled: false, style: 'Hệ thống (Mac)' },
+  { family: 'AppleMyungjo', group: 'ko', bundled: false, style: 'Hệ thống (Mac) · có chân' },
 
   { family: 'Noto Sans JP', group: 'ja', bundled: true, style: 'ゴシック · dễ đọc' },
   { family: 'M PLUS Rounded 1c', group: 'ja', bundled: true, style: '丸ゴシック · tròn' },
@@ -46,20 +48,26 @@ export const FONT_CATALOG: FontEntry[] = [
   { family: 'Shippori Mincho', group: 'ja', bundled: true, style: '明朝 · kể chuyện (朗読)' },
   { family: 'Sawarabi Mincho', group: 'ja', bundled: true, style: '明朝', boldOnly400: true },
   { family: 'Dela Gothic One', group: 'ja', bundled: true, style: 'Rất đậm · tiêu đề', boldOnly400: true },
-  { family: 'Yu Gothic', group: 'ja', bundled: false, style: 'Windows' },
-  { family: 'Meiryo', group: 'ja', bundled: false, style: 'Windows' },
-  { family: 'BIZ UDGothic', group: 'ja', bundled: false, style: 'Windows · UD' },
-  { family: 'Yu Mincho', group: 'ja', bundled: false, style: 'Windows' },
-  { family: 'BIZ UDMincho', group: 'ja', bundled: false, style: 'Windows · UD' },
-  { family: 'UD Digi Kyokasho N', group: 'ja', bundled: false, style: 'Windows · 教科書体' },
+  { family: 'Yu Gothic', group: 'ja', bundled: false, style: 'Hệ thống' },
+  { family: 'Meiryo', group: 'ja', bundled: false, style: 'Hệ thống' },
+  { family: 'BIZ UDGothic', group: 'ja', bundled: false, style: 'Hệ thống · UD' },
+  { family: 'Yu Mincho', group: 'ja', bundled: false, style: 'Hệ thống' },
+  { family: 'BIZ UDMincho', group: 'ja', bundled: false, style: 'Hệ thống · UD' },
+  { family: 'UD Digi Kyokasho N', group: 'ja', bundled: false, style: 'Hệ thống · 教科書体' },
+  { family: 'Hiragino Sans', group: 'ja', bundled: false, style: 'Hệ thống (Mac)' },
+  { family: 'Hiragino Maru Gothic ProN', group: 'ja', bundled: false, style: 'Hệ thống (Mac) · tròn' },
+  { family: 'Hiragino Mincho ProN', group: 'ja', bundled: false, style: 'Hệ thống (Mac) · 明朝' },
+  { family: 'YuGothic', group: 'ja', bundled: false, style: 'Hệ thống (Mac)' },
+  { family: 'YuMincho', group: 'ja', bundled: false, style: 'Hệ thống (Mac) · 明朝' },
 
   { family: 'Be Vietnam Pro', group: 'vi', bundled: true, style: 'Không chân · hiện đại' },
   { family: 'Roboto', group: 'vi', bundled: true, style: 'Không chân' },
   { family: 'Montserrat', group: 'vi', bundled: true, style: 'Không chân · tiêu đề' },
-  { family: 'Arial', group: 'vi', bundled: false, style: 'Windows' },
-  { family: 'Segoe UI', group: 'vi', bundled: false, style: 'Windows' },
-  { family: 'Tahoma', group: 'vi', bundled: false, style: 'Windows' },
-  { family: 'Times New Roman', group: 'vi', bundled: false, style: 'Windows · có chân' }
+  { family: 'Arial', group: 'vi', bundled: false, style: 'Hệ thống' },
+  { family: 'Segoe UI', group: 'vi', bundled: false, style: 'Hệ thống' },
+  { family: 'Tahoma', group: 'vi', bundled: false, style: 'Hệ thống' },
+  { family: 'Times New Roman', group: 'vi', bundled: false, style: 'Hệ thống · có chân' },
+  { family: 'Helvetica Neue', group: 'vi', bundled: false, style: 'Hệ thống (Mac)' }
 ];
 
 export const isBundled = (family: string) => FONT_CATALOG.some((f) => f.bundled && f.family.toLowerCase() === family.toLowerCase());
@@ -79,8 +87,8 @@ export function detectLang(text: string): 'ko' | 'ja' | 'vi' {
 // Chinese characters are shared by Korean and Japanese but drawn differently; the fallback order follows the
 // text's language so a Latin-only font never makes Japanese kanji appear in Korean glyph shapes (or vice versa).
 const FALLBACK: Record<'ko' | 'ja' | 'vi', string[]> = {
-  ko: ['Noto Sans KR', 'Malgun Gothic', 'Noto Sans JP'],
-  ja: ['Noto Sans JP', 'Yu Gothic', 'Meiryo', 'Noto Sans KR'],
+  ko: ['Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans JP'],
+  ja: ['Noto Sans JP', 'Yu Gothic', 'Hiragino Sans', 'Meiryo', 'Noto Sans KR'],
   vi: ['Be Vietnam Pro', 'Arial', 'Noto Sans KR', 'Noto Sans JP']
 };
 export function fontStack(family: string, text: string) {
