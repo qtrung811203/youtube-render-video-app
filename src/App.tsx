@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { defaultSettings } from '../electron/types';
-import type { EncoderInfo, LogoSettings, OutputLocation, Settings, SourceFolder, SubtitleStyle, Transform } from '../electron/types';
+import { defaultSettings, FPS_OPTIONS, outputSize, RESOLUTIONS } from '../electron/types';
+import type { EncoderInfo, LogoSettings, OutputLocation, Quality, Settings, SourceFolder, SubtitleStyle, Transform } from '../electron/types';
 import { api, bridge } from './bridge';
 import { clamp, prepareJob, textAt } from './composer';
 import { Inspector } from './Inspector';
@@ -12,6 +12,7 @@ type Status = 'idle' | 'queued' | 'preparing' | 'rendering' | 'done' | 'error' |
 type Item = SourceFolder & { checked: boolean; status: Status; progress?: number; speed?: number; phase?: string; output?: string; error?: string; note?: string };
 const SAMPLE_TEXT = 'Đây là nội dung phụ đề mẫu';
 const BUSY: Status[] = ['queued', 'preparing', 'rendering'];
+const outputOptions = (s: Settings) => ({ resolution: s.render.resolution, fps: s.render.fps, quality: s.render.quality });
 const isReady = (s: SourceFolder) => !!(s.imagePath && s.subtitlePath && s.audioPath);
 const message = (error: unknown) => String(error instanceof Error ? error.message : error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
@@ -88,7 +89,7 @@ export default function App() {
       const job = await prepareJob(source, s, cueList, 0, total, (done, count) => patchItem(id, { phase: `Dựng phụ đề ${done}/${count}` }), () => cancelled.current.has(id));
       if (cancelled.current.has(id)) { await api().discardJob(job.jobDir); throw new Error('Đã hủy'); }
       patchItem(id, { status: 'rendering', phase: undefined });
-      const result = await api().encode({ ...job, id, audioPath: source.audioPath!, start: 0, duration: total, encoder: resolveEncoder(s), preview: false, sourcePath: source.path, sourceName: source.name, outputLocation: s.render.outputLocation, outputDirectory: s.render.outputDirectory });
+      const result = await api().encode({ ...job, id, audioPath: source.audioPath!, start: 0, duration: total, encoder: resolveEncoder(s), preview: false, sourcePath: source.path, sourceName: source.name, outputLocation: s.render.outputLocation, outputDirectory: s.render.outputDirectory, ...outputOptions(s) });
       patchItem(id, { status: 'done', progress: 100, output: result.output, note: `${result.fallback ? 'GPU lỗi → CPU' : encoderLabel(result.encoder)} · ${formatTime(result.seconds)}` });
     } catch (error) {
       const wasCancelled = cancelled.current.has(id);
@@ -120,7 +121,7 @@ export default function App() {
   };
 
   // ---------- FFmpeg preview ----------
-  const signature = selected ? JSON.stringify([selected.imagePath, selected.subtitlePath, selected.audioPath, selected.transform, settings.logo, settings.layerOrder, settings.subtitle]) : '';
+  const signature = selected ? JSON.stringify([selected.imagePath, selected.subtitlePath, selected.audioPath, selected.transform, settings.logo, settings.layerOrder, settings.subtitle, outputOptions(settings)]) : '';
   const makePreview = async () => {
     if (!selected || !isReady(selected)) return; const s = settings; const source = selected; const sig = signature;
     setPreviewBusy('Đang dựng lớp…');
@@ -130,7 +131,7 @@ export default function App() {
       const job = await prepareJob(source, s, cueList, start, length);
       setPreviewBusy('Đang encode…');
       const encoder = resolveEncoder(s);
-      const result = await api().encode({ ...job, id: `preview-${Date.now()}`, audioPath: source.audioPath!, start, duration: length, encoder, preview: true, sourcePath: source.path, sourceName: source.name, outputLocation: 'inside', outputDirectory: '' });
+      const result = await api().encode({ ...job, id: `preview-${Date.now()}`, audioPath: source.audioPath!, start, duration: length, encoder, preview: true, sourcePath: source.path, sourceName: source.name, outputLocation: 'inside', outputDirectory: '', ...outputOptions(s) });
       const bytes = await api().readFile(result.output);
       setPreview((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'video/mp4' })), signature: sig, encoder: `${result.fallback ? 'GPU lỗi → CPU' : encoderLabel(result.encoder)} · ${result.seconds.toFixed(1)}s` }; });
       setShowVideo(true);
@@ -148,7 +149,7 @@ export default function App() {
   const gpuAvailable = !!encoders?.length;
   return <main>
     <header>
-      <div><h1>Background Video Renderer</h1><p>1920×1080 · 30fps · H.264 + AAC</p></div>
+      <div><h1>Background Video Renderer</h1><p>{outputSize(settings.render.resolution).width}×{settings.render.resolution} · {settings.render.fps}fps · H.264 + AAC</p></div>
       <div className="header-status">{stats.running ? <span className="pill live">Đang render · {stats.done}/{items.length} xong</span> : items.length > 0 && <span className="pill">{stats.done}/{items.length} đã render</span>}</div>
     </header>
     <section className="workspace">
@@ -174,6 +175,15 @@ export default function App() {
           <Toggle label="Bỏ qua video đã render" checked={settings.render.skipDone} onChange={(skipDone) => setRender({ skipDone })} />
         </div>
 
+        <div className="batch-card">
+          <label>Xuất video</label>
+          <div className="three">
+            <label>Độ phân giải<select value={settings.render.resolution} onChange={(e) => setRender({ resolution: Number(e.target.value) })}>{RESOLUTIONS.map((r) => <option key={r} value={r}>{r}p</option>)}</select></label>
+            <label>FPS<select value={settings.render.fps} onChange={(e) => setRender({ fps: Number(e.target.value) })}>{FPS_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+            <label>Chất lượng<select value={settings.render.quality} onChange={(e) => setRender({ quality: e.target.value as Quality })}><option value="high">Cao</option><option value="balanced">Cân bằng</option><option value="small">Nhỏ gọn</option></select></label>
+          </div>
+          <p className="hint">{outputSize(settings.render.resolution).width}×{settings.render.resolution}, {settings.render.fps} khung/giây. Video ảnh tĩnh: 720p hoặc 24 fps render nhanh hơn và file nhỏ hơn.</p>
+        </div>
         <div className="list-head">
           <label className="check-all"><input type="checkbox" checked={items.length > 0 && items.every((i) => i.checked)} onChange={(e) => setItems((list) => list.map((i) => ({ ...i, checked: e.target.checked })))} /> Nguồn <b>{items.length}</b></label>
           {items.length > 0 && <button className="link" disabled={stats.running} onClick={() => { setItems([]); setSelectedId(undefined); }}>Xóa hết</button>}

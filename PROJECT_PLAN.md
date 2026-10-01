@@ -4,7 +4,7 @@
 
 Ứng dụng Windows desktop tạo video nền hàng loạt từ từng thư mục nguồn. Mỗi video gồm một ảnh tĩnh, audio, subtitle SRT và tùy chọn logo dùng chung.
 
-Kết quả xuất là MP4 1920×1080, 30fps, H.264 + AAC; thời lượng video được lấy theo file audio. File kết quả tên `ten-thu-muc_render.mp4` (tự thêm số thứ tự nếu trùng), lưu trong thư mục nguồn, cạnh thư mục nguồn hoặc thư mục tùy chọn.
+Kết quả xuất là MP4 H.264 + AAC, mặc định 1920×1080 30fps (đổi được độ phân giải/FPS/chất lượng); thời lượng video được lấy theo file audio. File kết quả tên `ten-thu-muc_render.mp4` (tự thêm số thứ tự nếu trùng), lưu trong thư mục nguồn, cạnh thư mục nguồn hoặc thư mục tùy chọn.
 
 ## 2. Trạng thái hiện tại (v2)
 
@@ -16,6 +16,7 @@ Kết quả xuất là MP4 1920×1080, 30fps, H.264 + AAC; thời lượng video
 - **Preview FFmpeg 5/10/20 giây** hiển thị ngay trong khung (chế độ *Video preview*), có cảnh báo khi preview đã cũ so với cài đặt.
 - **Inspector (cột phải):** 3 tab theo phần tử đang chọn. Ảnh nền (riêng từng thư mục, có “Áp dụng cho tất cả”); Logo (thư viện dạng lưới ảnh, 9 vị trí đặt nhanh, opacity, thứ tự lớp); Phụ đề (mẫu nhanh, font hệ thống, đậm/nghiêng, viền, đổ bóng, giãn dòng, căn chữ, nền: Không/Ôm chữ/Toàn ngang, padding, bo góc).
 - Khung ảnh của từng thư mục được lưu theo đường dẫn, mở lại thư mục sẽ khôi phục.
+- **Cấu hình xuất (cột trái → Xuất video):** độ phân giải 480p/720p/1080p/1440p, FPS 15/24/25/30/60, chất lượng Cao/Cân bằng/Nhỏ gọn (CRF/CQ/QP hoặc bitrate VideoToolbox theo độ phân giải). Editor luôn làm việc ở 1920×1080; FFmpeg scale ảnh nền, logo và từng câu phụ đề một lần (không scale mỗi frame), vị trí nhân theo tỉ lệ.
 - **Font đa ngôn ngữ (`src/fonts.ts`, `src/FontPicker.tsx`):** bộ chọn font theo tab Hàn / Nhật / Việt / Máy tính, mỗi dòng xem trước bằng chính câu phụ đề hiện tại. Font đóng gói kèm app (không phụ thuộc máy): Hàn — Noto Sans KR, Nanum Gothic, Gowun Dodum, Noto Serif KR, Nanum Myeongjo, Jua, Do Hyeon, Black Han Sans; Nhật — Noto Sans JP, M PLUS Rounded 1c, Zen Maru Gothic, Kosugi Maru, Noto Serif JP, Shippori Mincho, Sawarabi Mincho, Dela Gothic One; Việt — Be Vietnam Pro, Roboto, Montserrat. Font Windows (Malgun Gothic, Yu Gothic, Meiryo, BIZ UD, Yu Mincho…) chỉ hiện khi máy có cài.
 - Font dự phòng chọn theo ngôn ngữ của từng câu (có kana → Nhật, có Hangul → Hàn) để chữ Hán không bị vẽ nhầm kiểu Hàn/Nhật; cảnh báo khi font và ngôn ngữ phụ đề không khớp.
 - Ngắt dòng bằng `Intl.Segmenter`: tiếng Nhật ngắt theo từ + quy tắc kinsoku (không mở dòng bằng 、。」…, không kết dòng bằng 「（…), tiếng Hàn giữ nguyên cụm từ (어절).

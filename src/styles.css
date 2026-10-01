@@ -146,3 +146,7 @@ input[type=range] { padding: 0; border: 0; background: none; accent-color: #6d7e
 .font-name { font-size: 11.5px; color: #aeb8cf; display: flex; align-items: center; }
 .font-sample { font-size: 19px; line-height: 1.3; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .font-row small { color: #7c879f; font-size: 10.5px; }
+
+.three { display: grid; grid-template-columns: 1fr 0.8fr 1.1fr; gap: 6px; }
+.three label { margin-bottom: 6px; }
+.three select { padding: 6px 4px; }

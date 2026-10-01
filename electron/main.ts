@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFi
 import { basename, dirname, extname, join, normalize, relative, resolve, isAbsolute } from 'path';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobe from '@ffprobe-installer/ffprobe';
-import { Cue, defaultSettings, EncodeRequest, EncodeResult, EncoderInfo, Settings, SourceFolder } from './types';
+import { Cue, defaultSettings, EncodeRequest, EncodeResult, EncoderInfo, FRAME_W, outputSize, Quality, Settings, SourceFolder } from './types';
 
 const imageExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp']);
 const audioExt = new Set(['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg']);
@@ -100,16 +100,21 @@ function detectEncoders() {
   })).then((list) => list.filter((item): item is EncoderInfo => !!item));
   return encoderProbe;
 }
-function encoderArgs(encoder: string) {
+function encoderArgs(encoder: string, quality: Quality, height: number) {
+  // Quantizer offset per quality level: lower = sharper and larger files.
+  const q = { high: -3, balanced: 0, small: 4 }[quality] ?? 0;
   switch (encoder) {
-    case 'h264_nvenc': return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', '21', '-b:v', '0'];
-    case 'h264_amf': return ['-c:v', 'h264_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', '20', '-qp_p', '22'];
-    case 'h264_qsv': return ['-c:v', 'h264_qsv', '-preset', 'faster', '-global_quality', '21'];
-    // Constant-quality (-q:v) only exists on Apple Silicon, so use a bitrate that works on Intel Macs too.
-    // allow_sw lets VMs without a media engine (e.g. CI runners) fall back to Apple's software encoder.
-    case 'h264_videotoolbox': return ['-c:v', 'h264_videotoolbox', '-b:v', '8M', '-maxrate', '12M', '-bufsize', '16M', '-allow_sw', '1'];
+    case 'h264_nvenc': return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', String(22 + q), '-b:v', '0'];
+    case 'h264_amf': return ['-c:v', 'h264_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', String(20 + q), '-qp_p', String(22 + q)];
+    case 'h264_qsv': return ['-c:v', 'h264_qsv', '-preset', 'faster', '-global_quality', String(22 + q)];
+    case 'h264_videotoolbox': {
+      // Constant-quality (-q:v) only exists on Apple Silicon, so use a bitrate that works on Intel Macs too.
+      // allow_sw lets VMs without a media engine (e.g. CI runners) fall back to Apple's software encoder.
+      const mbps = (height <= 480 ? 2.5 : height <= 720 ? 5 : height <= 1080 ? 8 : 16) * ({ high: 1.5, balanced: 1, small: 0.6 }[quality] ?? 1);
+      return ['-c:v', 'h264_videotoolbox', '-b:v', `${mbps}M`, '-maxrate', `${mbps * 1.5}M`, '-bufsize', `${mbps * 2}M`, '-allow_sw', '1'];
+    }
     // A still background changes rarely, so x264 can use a fast preset without visible loss.
-    default: return ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-crf', '20'];
+    default: return ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-crf', String(21 + q)];
   }
 }
 function uniqueOutput(folder: string, base: string) { let result = join(folder, `${base}_render.mp4`); let i = 2; while (existsSync(result)) result = join(folder, `${base}_render_${i++}.mp4`); return result; }
@@ -122,23 +127,28 @@ function concatPath(file: string) { return file.replace(/\\/g, '/').replace(/'/g
 
 function spawnEncode(request: EncodeRequest, encoder: string, output: string): Promise<void> {
   const job = active.get(request.id)!;
+  const { width, height } = outputSize(request.resolution); const fps = request.fps; const k = width / FRAME_W;
+  // Layers are drawn at 1920×1080. When exporting another size each layer is scaled where it has only a few
+  // frames (the background once, each subtitle line once, the logo once), never on every output frame.
+  const fit = (w: string, h: string) => k === 1 ? '' : `scale=${w}:${h}:flags=lanczos,`;
+  const at = (value: number) => Math.round(value * k);
   // The background is decoded and converted to YUV once, then repeated by the loop filter; re-decoding a
   // 1080p PNG per frame (-loop 1 input) made encoding ~3x slower.
-  const args = ['-hide_banner', '-y', '-framerate', '30', '-i', join(request.jobDir, 'bg.png'), '-ss', String(request.start), '-i', request.audioPath];
-  let input = 2; let video = '[bg]'; const filters: string[] = ['[0:v]format=yuv420p,loop=loop=-1:size=1:start=0,setpts=N/30/TB[bg]'];
+  const args = ['-hide_banner', '-y', '-framerate', String(fps), '-i', join(request.jobDir, 'bg.png'), '-ss', String(request.start), '-i', request.audioPath];
+  let input = 2; let video = '[bg]'; const filters: string[] = [`[0:v]${fit(String(width), String(height))}format=yuv420p,loop=loop=-1:size=1:start=0,setpts=N/${fps}/TB[bg]`];
   if (request.segments.length) {
     const list = ['ffconcat version 1.0', ...request.segments.flatMap((s) => [`file '${concatPath(join(request.jobDir, s.file))}'`, `duration ${(s.ms / 1000).toFixed(3)}`]), `file '${concatPath(join(request.jobDir, request.segments[request.segments.length - 1].file))}'`];
     writeFileSync(join(request.jobDir, 'subs.ffconcat'), list.join('\n'), 'utf8');
     args.push('-f', 'concat', '-safe', '0', '-i', join(request.jobDir, 'subs.ffconcat'));
-    filters.push(`${video}[${input}:v]overlay=0:${request.bandTop}:eof_action=repeat:format=yuv420[sub]`); video = '[sub]'; input++;
+    filters.push(`[${input}:v]${fit(String(width), '-2')}null[band]`, `${video}[band]overlay=0:${at(request.bandTop)}:eof_action=repeat:format=yuv420[sub]`); video = '[sub]'; input++;
   }
   if (request.logo) {
     // A single-frame input: overlay keeps repeating its last frame, so the PNG is decoded only once.
     args.push('-i', join(request.jobDir, request.logo.file));
-    filters.push(`${video}[${input}:v]overlay=${request.logo.x}:${request.logo.y}:eof_action=repeat:format=yuv420[logo]`); video = '[logo]'; input++;
+    filters.push(`[${input}:v]${fit(`max(2\\,round(iw*${k}))`, `max(2\\,round(ih*${k}))`)}null[logoimg]`, `${video}[logoimg]overlay=${at(request.logo.x)}:${at(request.logo.y)}:eof_action=repeat:format=yuv420[logo]`); video = '[logo]'; input++;
   }
   filters.push(`${video}format=yuv420p[v]`);
-  args.push('-filter_complex', filters.join(';'), '-map', '[v]', '-map', '1:a:0', '-t', request.duration.toFixed(3), '-r', '30', ...encoderArgs(encoder), '-g', '150', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', output);
+  args.push('-filter_complex', filters.join(';'), '-map', '[v]', '-map', '1:a:0', '-t', request.duration.toFixed(3), '-r', String(fps), ...encoderArgs(encoder, request.quality, height), '-g', String(fps * 5), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', output);
   return new Promise((resolvePromise, reject) => {
     const child = spawn(ffmpegBin(), args); job.process = child; let stderr = ''; let lastSent = 0;
     child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-4000); });

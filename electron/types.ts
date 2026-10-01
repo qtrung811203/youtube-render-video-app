@@ -21,7 +21,16 @@ export interface SubtitleStyle {
   backgroundMode: BackgroundMode; backgroundColor: string; backgroundOpacity: number; paddingX: number; paddingY: number; radius: number;
 }
 
-export interface RenderOptions { encoder: EncoderMode; gpuEncoder: string; concurrency: number; outputLocation: OutputLocation; outputDirectory: string; skipDone: boolean }
+export type Quality = 'high' | 'balanced' | 'small';
+/** Output height; width follows 16:9. The editor always works in 1920×1080 and FFmpeg scales the layers. */
+export const RESOLUTIONS = [480, 720, 1080, 1440] as const;
+export const FPS_OPTIONS = [15, 24, 25, 30, 60] as const;
+export const outputSize = (height: number) => ({ width: Math.round(height * 16 / 9 / 2) * 2, height });
+
+export interface RenderOptions {
+  encoder: EncoderMode; gpuEncoder: string; concurrency: number; outputLocation: OutputLocation; outputDirectory: string; skipDone: boolean;
+  resolution: number; fps: number; quality: Quality;
+}
 
 export interface Settings {
   logo: LogoSettings; layerOrder: LayerOrder; subtitle: SubtitleStyle; render: RenderOptions;
@@ -42,6 +51,7 @@ export interface EncodeRequest {
   /** Logo overlaid above subtitles (only when layer order is logo-above; otherwise it is baked into bg.png). */
   logo: { file: string; x: number; y: number } | null;
   encoder: string; preview: boolean; sourcePath: string; sourceName: string;
+  resolution: number; fps: number; quality: Quality;
   outputLocation: OutputLocation; outputDirectory: string;
 }
 export interface EncodeResult { output: string; encoder: string; fallback: boolean; seconds: number }
@@ -55,6 +65,6 @@ export const defaultSettings: Settings = {
     x: 0.5, y: 0.92, width: 0.8,
     backgroundMode: 'content', backgroundColor: '#000000', backgroundOpacity: 0.45, paddingX: 28, paddingY: 10, radius: 8
   },
-  render: { encoder: 'gpu', gpuEncoder: '', concurrency: 1, outputLocation: 'inside', outputDirectory: '', skipDone: true },
+  render: { encoder: 'gpu', gpuEncoder: '', concurrency: 1, outputLocation: 'inside', outputDirectory: '', skipDone: true, resolution: 1080, fps: 30, quality: 'balanced' },
   sourceTransforms: {}
 };
