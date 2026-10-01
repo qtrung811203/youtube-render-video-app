@@ -44,8 +44,14 @@ function readSettings(): Settings { try { return migrateSettings(JSON.parse(read
 function saveSettings(settings: Settings) { writeFileSync(settingsFile(), JSON.stringify(settings, null, 2)); }
 
 // ---------- folders ----------
+/**
+ * Dot-files are never user media. On macOS this matters: copies on exFAT/FAT/network drives get
+ * AppleDouble metadata twins ("._photo.jpg") that share the real file's extension and sort first.
+ * __MACOSX holds the same junk when a zip made on a Mac is extracted.
+ */
+function isHidden(name: string) { return name.startsWith('.') || name === '__MACOSX'; }
 function scanFolder(folder: string): SourceFolder {
-  const files = readdirSync(folder, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => join(folder, entry.name));
+  const files = readdirSync(folder, { withFileTypes: true }).filter((entry) => entry.isFile() && !isHidden(entry.name)).map((entry) => join(folder, entry.name));
   const images = files.filter((file) => imageExt.has(extname(file).toLowerCase()));
   const subtitles = files.filter((file) => extname(file).toLowerCase() === '.srt');
   const audios = files.filter((file) => audioExt.has(extname(file).toLowerCase()));
@@ -57,7 +63,7 @@ function scanFolder(folder: string): SourceFolder {
 }
 function isDir(path: string) { try { return statSync(path).isDirectory(); } catch { return false; } }
 function scanPaths(paths: string[]) { return paths.filter(isDir).map(scanFolder); }
-function subfolders(parent: string) { return readdirSync(parent, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => join(parent, e.name)); }
+function subfolders(parent: string) { return readdirSync(parent, { withFileTypes: true }).filter((e) => e.isDirectory() && !isHidden(e.name)).map((e) => join(parent, e.name)); }
 
 // ---------- subtitles ----------
 function decodeText(buffer: Buffer) {
@@ -196,7 +202,7 @@ ipcMain.handle('folders:select-parent', async () => { const result = await dialo
 ipcMain.handle('folders:scan', (_e, paths: string[]) => { const direct = paths.filter(isDir); const expanded = direct.flatMap((dir) => { const own = scanFolder(dir); return own.errors.length === 3 ? subfolders(dir) : [dir]; }); return scanPaths(expanded); });
 ipcMain.handle('folders:reload', (_e, folders: string[]) => scanPaths(folders));
 ipcMain.handle('dir:select', async () => { const result = await dialog.showOpenDialog({ properties: ['openDirectory'] }); return result.canceled ? null : result.filePaths[0]; });
-ipcMain.handle('logos:list', (_e, directory: string) => { try { return readdirSync(directory).filter((name) => imageExt.has(extname(name).toLowerCase())).map((name) => join(directory, name)); } catch { return []; } });
+ipcMain.handle('logos:list', (_e, directory: string) => { try { return readdirSync(directory).filter((name) => !isHidden(name) && imageExt.has(extname(name).toLowerCase())).map((name) => join(directory, name)); } catch { return []; } });
 ipcMain.handle('settings:load', () => readSettings());
 ipcMain.handle('settings:save', (_e, settings: Settings) => saveSettings(settings));
 ipcMain.handle('file:read', (_e, path: string) => readFileSync(path));
